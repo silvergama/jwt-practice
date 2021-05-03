@@ -101,3 +101,18 @@ func GenerateHashPassword(password string) (string, error) {
 	bytes, err := bcrypt.GenerateFromPassword([]byte(password), 14)
 	return string(bytes), err
 }
+
+func main() {
+	CreateRouter()
+	InitializeRoute()
+
+	http.Handle("/", router)
+	svr := &http.Server{
+		Addr:    ":8080",
+		Handler: http.DefaultServeMux,
+	}
+	err := svr.ListenAndServe()
+	if err != nil {
+		log.Fatal(err)
+	}
+}
