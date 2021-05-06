@@ -3,13 +3,16 @@ package main
 import (
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/dgrijalva/jwt-go"
 	"github.com/gorilla/mux"
+	_ "github.com/mattn/go-sqlite3"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -100,6 +103,57 @@ func GetDatabase() *sql.DB {
 func GenerateHashPassword(password string) (string, error) {
 	bytes, err := bcrypt.GenerateFromPassword([]byte(password), 14)
 	return string(bytes), err
+}
+
+func SignIn(w http.ResponseWriter, r *http.Request) {
+	db := GetDatabase()
+	defer db.Close()
+
+	var authDetail Authentication
+	err := json.NewDecoder(r.Body).Decode(&authDetail)
+	if err != nil {
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(err)
+		return
+	}
+
+	var authUser User
+	// TODO: select user
+	if strings.TrimSpace(authUser.Email) == "" {
+		w.Header().Set("Content-Type", "application/json")
+		err := errors.New("Username or Password is incorrect")
+		json.NewEncoder(w).Encode(err)
+		return
+	}
+
+	check := CheckPasswordHash(authDetail.Password, authUser.Password)
+	if !check {
+		err := errors.New("Username or Password is incorrect")
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(err)
+		return
+	}
+
+	validToken, err := GenerateJWT(authUser.Email, authUser.Role)
+	if err != nil {
+		err := errors.New("Failed to generate token")
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(err)
+		return
+	}
+
+	token := Token{
+		Email:       authUser.Email,
+		Role:        authUser.Role,
+		TokenString: validToken,
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(token)
+}
+
+func CheckPasswordHash(password, hash string) bool {
+	err := bcrypt.CompareHashAndPassword([]byte(hash), []byte(password))
+	return err != nil
 }
 
 func main() {
