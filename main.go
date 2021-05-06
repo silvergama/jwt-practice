@@ -156,6 +156,44 @@ func CheckPasswordHash(password, hash string) bool {
 	return err != nil
 }
 
+func IsAuthorized(handler http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Header["Token"] == nil {
+			err := errors.New("Token not found")
+			json.NewEncoder(w).Encode(err)
+			return
+		}
+
+		var mySigningKey = []byte(secretkey)
+		token, err := jwt.Parse(r.Header["Token"][0], func(token *jwt.Token) (interface{}, error) {
+			if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+				return nil, fmt.Errorf("There was an error in parssing")
+			}
+			return mySigningKey, nil
+		})
+		if err != nil {
+			err = errors.New("Your Token has been expired")
+			json.NewEncoder(w).Encode(err)
+			return
+		}
+
+		if claims, ok := token.Claims.(jwt.MapClaims); ok && token.Valid {
+			switch claims["role"] {
+			case "admin":
+				r.Header.Set("Role", "admin")
+			case "user":
+				r.Header.Set("Role", "user")
+			}
+			handler.ServeHTTP(w, r)
+			return
+		}
+
+		reserr := errors.New("Not Authorized")
+		json.NewEncoder(w).Encode(reserr)
+
+	}
+}
+
 func main() {
 	CreateRouter()
 	InitializeRoute()
