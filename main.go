@@ -64,6 +64,25 @@ func CreateRouter() {
 
 func InitializeRoute() {
 	router.HandleFunc("/signup", SignUp).Methods("POST")
+	router.HandleFunc("/sigin", SignIn).Methods("POST")
+	router.HandleFunc("/admin", IsAuthorized(AdminIndex)).Methods("GET")
+	router.HandleFunc("/user", IsAuthorized(UserIndex)).Methods("GET")
+}
+
+func AdminIndex(w http.ResponseWriter, r *http.Request) {
+	if r.Header.Get("Role") != "admin" {
+		w.Write([]byte("Not Authorized"))
+		return
+	}
+	w.Write([]byte("Welcome, Admin."))
+}
+
+func UserIndex(w http.ResponseWriter, r *http.Request) {
+	if r.Header.Get("Role") != "user" {
+		w.Write([]byte("Not Authorized"))
+		return
+	}
+	w.Write([]byte("Welcome, User."))
 }
 
 func SignUp(w http.ResponseWriter, r *http.Request) {
